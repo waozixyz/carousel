@@ -3,3 +3,5 @@ bin/
 build/
 obj/
 build_web/
+carousel
+.kryon
