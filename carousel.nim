@@ -219,6 +219,38 @@ proc drawCarousel(ctx: DrawingContext, width, height: float) =
     ctx.closePath()
     ctx.stroke()
 
+  # Draw text labels in sectors
+  let textRadius = radius * 0.7  # Position text at 70% of radius from center
+  let fontSize = max(16, int(24.0 / (1.0 + options.len.float * 0.05)))  # Dynamic font size - bigger!
+
+  for i in 0..<options.len:
+    let startAngle = currentAngle + i.float * sectorAngle - 90.0
+    let middleAngle = startAngle + sectorAngle / 2.0  # Middle of sector
+
+    # Convert to radians for text positioning
+    let middleRad = middleAngle * PI / 180.0
+
+    # Calculate text position
+    let textX = centerX + cos(middleRad) * textRadius
+    let textY = centerY + sin(middleRad) * textRadius
+
+    # Determine text color based on sector background brightness
+    let opt = options[i]
+    let blendedR = (opt.r.int + parseHexInt(theme.accent[1..2])) div 2
+    let blendedG = (opt.g.int + parseHexInt(theme.accent[3..4])) div 2
+    let blendedB = (opt.b.int + parseHexInt(theme.accent[5..6])) div 2
+
+    # Calculate perceived brightness (luminance)
+    let brightness = (0.299 * blendedR.float + 0.587 * blendedG.float + 0.114 * blendedB.float) / 255.0
+    let textColor = if brightness > 0.5: rgba(0, 0, 0, 255) else: rgba(255, 255, 255, 255)
+
+    # Set text properties and draw
+    ctx.fillStyle = textColor
+    ctx.font = "Arial " & $fontSize
+
+    # Center text on calculated position
+    ctx.fillText(opt.text, textX, textY)
+
   # Draw pointer triangle
   let accentColor = theme.accent
   let accentR = parseHexInt(accentColor[1..2]).uint8
@@ -299,7 +331,8 @@ let app = kryonApp:
   Body:
     backgroundColor = getCurrentTheme().background
 
-
+    onUpdate = proc(deltaTime: float) =
+          updateSpin()
     Text:
       text = "Decision Wheel"
       fontSize = 32
@@ -322,65 +355,87 @@ let app = kryonApp:
           width = 80
           height = 30
           fontSize = 14
-
-    # Left side - Options list
-    Column:
-      width = 350
-      gap = 10
-      backgroundColor = getCurrentTheme().primary
-
-      for i in 0..<options.len:
-        Row:
-          gap = 10
-          alignItems = "center"
-
-          Text:
-            text = $(i + 1) & ". " & options[i].text
-            fontSize = 16
-            color = getCurrentTheme().text
-            width = 180
-
-          Button:
-            text = "Edit"
-            onClick = editOption(i)
-            backgroundColor = getCurrentTheme().accent
-            textColor = getCurrentTheme().text
-            width = 60
-            height = 25
-            fontSize = 12
-
-          Button:
-            text = "Delete"
-            onClick = deleteOption(i)
-            backgroundColor = "#d32f2f"
-            textColor = "#ffffff"
-            width = 60
-            height = 25
-            fontSize = 12
-
-      Spacer()
-      
-      Text:
-        echo isEditMode
-        text = if isEditMode: "Editing option..." else: "Add new option"
-        fontSize = 14
-        color = getCurrentTheme().text
-
-      Input:
-        value = inputText
-        onTextChange = proc(text: string) = inputText = text
-        onSubmit = proc() = addOption()
-        fontSize = 16
-        color = getCurrentTheme().text
-        backgroundColor = getCurrentTheme().secondary
+    Row:
+      # Left side - Options list
+      Column:
         width = 350
-        height = 40
+        gap = 10
+        backgroundColor = getCurrentTheme().primary
 
-      Button:
-        text = if isEditMode: "Save Edit" else: "Add Option"
-        onClick = proc() = addOption()
-        backgroundColor = getCurrentTheme().accent
-        textColor = getCurrentTheme().text
-        width = 350
-        height = 40
-        fontSize = 16
+        for i in 0..<options.len:
+          Row:
+            gap = 10
+            alignItems = "center"
+
+            Text:
+              text = $(i + 1) & ". " & options[i].text
+              fontSize = 16
+              color = getCurrentTheme().text
+              width = 180
+
+            Button:
+              text = "Edit"
+              onClick = editOption(i)
+              backgroundColor = getCurrentTheme().accent
+              textColor = getCurrentTheme().text
+              width = 60
+              height = 25
+              fontSize = 12
+
+            Button:
+              text = "Delete"
+              onClick = deleteOption(i)
+              backgroundColor = "#d32f2f"
+              textColor = "#ffffff"
+              width = 60
+              height = 25
+              fontSize = 12
+
+        Spacer()
+        
+        Text:
+          echo isEditMode
+          text = if isEditMode: "Editing option..." else: "Add new option"
+          fontSize = 14
+          color = getCurrentTheme().text
+
+        Input:
+          value = inputText
+          onTextChange = proc(text: string) = inputText = text
+          onSubmit = proc() = addOption()
+          fontSize = 16
+          color = getCurrentTheme().text
+          backgroundColor = getCurrentTheme().secondary
+          width = 350
+          height = 40
+
+        Button:
+          text = if isEditMode: "Save Edit" else: "Add Option"
+          onClick = proc() = addOption()
+          backgroundColor = getCurrentTheme().accent
+          textColor = getCurrentTheme().text
+          width = 350
+          height = 40
+          fontSize = 16
+
+
+      # Right side - Carousel canvas
+      Column:
+        gap = 10
+        alignItems = "center"
+        flex = 1
+        Canvas:
+          width = 500
+          height = 500
+          backgroundColor = getCurrentTheme().primary
+          onDraw = drawCarousel
+
+        Button:
+          text = if isSpinning: "Spinning..." else: "SPIN THE WHEEL!"
+          onClick = proc() = spinWheel()
+          backgroundColor = if isSpinning: getCurrentTheme().secondary else: "#f39c12"
+          textColor = "#ffffff"
+          width = 300
+          height = 60
+          fontSize = 24
+          disabled = isSpinning or options.len == 0
