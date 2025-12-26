@@ -1,0 +1,22 @@
+[project]
+name = "carousel"
+version = "1.0.0"
+description = "Decision wheel carousel application"
+frontend = "lua"
+
+[build]
+output_dir = "build"
+entry_point = "carousel.lua"
+
+[window]
+title = "Decision Wheel"
+width = 900
+height = 700
+resizable = true
+
+[plugins]
+canvas = { path = "/home/wao/Projects/kryon-canvas" }
+
+[backends]
+default = "desktop"
+desktop = "sdl3"
