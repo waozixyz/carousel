@@ -2,7 +2,6 @@
 -- A spinning wheel app built with Kryon and Canvas plugin
 
 local UI = require("kryon.dsl")
-local Reactive = require("kryon.reactive")
 local canvas = require("canvas")
 
 -- ============================================================================
@@ -209,18 +208,37 @@ local function updateSpin(deltaTime)
         return
     end
 
-    state.currentAngle = state.currentAngle + state.spinSpeed
-    state.spinSpeed = state.spinSpeed * 0.97
-
-    if state.spinSpeed < 0.1 then
-        state.isSpinning = false
-        state.spinSpeed = 0
-
-        -- Snap to nearest option
+    -- When spinning slows down, start smooth easing to target
+    if state.spinSpeed < 2.0 then
+        -- Calculate target angle (center of nearest segment)
         local angleStep = 360 / #state.options
         local normalizedAngle = state.currentAngle % 360
         local nearestIndex = math.floor((normalizedAngle + angleStep / 2) / angleStep) + 1
-        state.currentAngle = (nearestIndex - 1) * angleStep
+        local targetAngle = (nearestIndex - 1) * angleStep + angleStep / 2
+
+        -- Calculate shortest path to target (handle wraparound)
+        local currentNormalized = state.currentAngle % 360
+        local delta = targetAngle - currentNormalized
+        if delta > 180 then
+            delta = delta - 360
+        elseif delta < -180 then
+            delta = delta + 360
+        end
+
+        -- Smooth ease toward target (ONLY easing, no spinSpeed)
+        local adjustedTarget = state.currentAngle + delta
+        state.currentAngle = state.currentAngle + (adjustedTarget - state.currentAngle) * 0.15
+
+        -- Stop when very close to target
+        if math.abs(adjustedTarget - state.currentAngle) < 0.01 then
+            state.isSpinning = false
+            state.spinSpeed = 0
+            state.currentAngle = adjustedTarget
+        end
+    else
+        -- Normal spinning: apply speed and deceleration
+        state.currentAngle = state.currentAngle + state.spinSpeed
+        state.spinSpeed = state.spinSpeed * 0.97
     end
 end
 
