@@ -11,10 +11,9 @@ local canvas = require("canvas")
 
 local state = {
     options = {
-        {text = "Option 1", r = 255, g = 100, b = 100},
-        {text = "Option 2", r = 100, g = 255, b = 100},
-        {text = "Option 3", r = 100, g = 100, b = 255},
-        {text = "Option 4", r = 255, g = 255, b = 100},
+        {text = "Meditation", r = 100, g = 180, b = 255},  -- Blue
+        {text = "Push ups", r = 255, g = 100, b = 100},    -- Red
+        {text = "Jogging", r = 100, g = 255, b = 100},     -- Green
     },
     currentAngle = 0,
     spinSpeed = 0,
@@ -27,9 +26,9 @@ local state = {
 local themes = {
     {
         name = "Dark",
-        background = "#1e1e1e",
-        primary = "#2d2d2d",
-        secondary = "#3d3d3d",
+        background = "#0a0a0a",
+        primary = "#151515",
+        secondary = "#202020",
         text = "#ffffff",
         accent = "#4a9eff",
     },
@@ -84,53 +83,106 @@ end
 -- ============================================================================
 
 local function drawCarousel(canvasWidth, canvasHeight)
+    print(string.format("[CAROUSEL] drawCarousel called: width=%d height=%d, options=%d", canvasWidth, canvasHeight, #state.options))
+
+    local theme = themes[state.currentTheme]
+
+    -- Clear canvas with background color
+    local bgHex = theme.secondary:gsub("#", "")
+    local bgR = tonumber(bgHex:sub(1, 2), 16)
+    local bgG = tonumber(bgHex:sub(3, 4), 16)
+    local bgB = tonumber(bgHex:sub(5, 6), 16)
+    canvas.clear(bgR, bgG, bgB, 255)
+
     local centerX = canvasWidth / 2
     local centerY = canvasHeight / 2
     local radius = math.min(canvasWidth, canvasHeight) / 2 - 50
 
     if #state.options == 0 then
+        print("[CAROUSEL] No options to draw")
         return
     end
-
-    local theme = themes[state.currentTheme]
     local angleStep = (2 * math.pi) / #state.options
+    local currentAngleRad = math.rad(state.currentAngle)
 
-    -- Draw wheel sectors
+    -- Draw wheel sectors as pie chart
     for i, option in ipairs(state.options) do
-        local startAngle = (i - 1) * angleStep + math.rad(state.currentAngle)
-        local endAngle = i * angleStep + math.rad(state.currentAngle)
-        local midAngle = (startAngle + endAngle) / 2
+        local startAngle = (i - 1) * angleStep + currentAngleRad - math.pi / 2
+        local endAngle = i * angleStep + currentAngleRad - math.pi / 2
 
-        -- Blend option color with theme accent
-        local accentR, accentG, accentB = hexToRGBA(theme.accent)
+        -- Blend option color with theme accent for visual appeal
+        local accentR, accentG, accentB = 0x4a, 0x9e, 0xff  -- Default blue accent
+        if theme.accent then
+            local accentHex = theme.accent:gsub("#", "")
+            accentR = tonumber(accentHex:sub(1, 2), 16) or accentR
+            accentG = tonumber(accentHex:sub(3, 4), 16) or accentG
+            accentB = tonumber(accentHex:sub(5, 6), 16) or accentB
+        end
+
         local r, g, b = blendColors(option.r, option.g, option.b, accentR, accentG, accentB, 0.2)
 
-        -- Draw sector (simplified - would need arc support)
-        -- For now, draw as circles to represent options
-        local optionX = centerX + math.cos(midAngle) * (radius * 0.7)
-        local optionY = centerY + math.sin(midAngle) * (radius * 0.7)
-
+        -- Draw pie sector as polygon (arc doesn't support fill mode)
         canvas.fill(r, g, b)
-        canvas.circle("fill", optionX, optionY, 40)
 
-        -- Draw text
+        -- Create polygon vertices for pie sector
+        local vertices = {centerX, centerY}  -- Start at center
+        local numSegments = 32
+        for j = 0, numSegments do
+            local angle = startAngle + (endAngle - startAngle) * (j / numSegments)
+            local px = centerX + math.cos(angle) * radius
+            local py = centerY + math.sin(angle) * radius
+            table.insert(vertices, px)
+            table.insert(vertices, py)
+        end
+        canvas.polygon("fill", vertices)
+
+        -- Draw text on sector
+        local midAngle = (startAngle + endAngle) / 2
+        local textRadius = radius * 0.6
+        local textX = centerX + math.cos(midAngle) * textRadius
+        local textY = centerY + math.sin(midAngle) * textRadius
+
+        -- Measure text to center it properly
+        local textWidth = canvas.getTextWidth(option.text)
+        local textHeight = canvas.getTextHeight()
+
+        -- Save transform state
+        canvas.push()
+
+        -- Move to text position
+        canvas.translate(textX, textY)
+
+        -- Rotate text to align with sector (optional - makes it more readable)
+        canvas.rotate(midAngle + math.pi / 2)
+
+        -- Draw centered text
         canvas.fill(255, 255, 255)
-        canvas.setFontSize(16)
-        canvas.print(option.text, optionX - 20, optionY - 8)
+        canvas.print(option.text, -textWidth / 2, -textHeight / 2)
+
+        -- Restore transform state
+        canvas.pop()
     end
 
     -- Draw center circle
-    canvas.fill(hexToRGBA(theme.primary))
+    if theme.primary then
+        local hexColor = theme.primary:gsub("#", "")
+        local pr = tonumber(hexColor:sub(1, 2), 16) or 45
+        local pg = tonumber(hexColor:sub(3, 4), 16) or 45
+        local pb = tonumber(hexColor:sub(5, 6), 16) or 45
+        canvas.fill(pr, pg, pb)
+    else
+        canvas.fill(45, 45, 45)
+    end
     canvas.circle("fill", centerX, centerY, 50)
 
-    -- Draw pointer
+    -- Draw pointer triangle at top
     canvas.fill(255, 0, 0)
-    local pointerPoints = {
-        {x = centerX + radius + 10, y = centerY},
-        {x = centerX + radius - 10, y = centerY - 15},
-        {x = centerX + radius - 10, y = centerY + 15},
-    }
-    canvas.polygon("fill", pointerPoints)
+    local pointerY = centerY - radius - 10
+    canvas.polygon("fill", {
+        centerX, pointerY - 10,
+        centerX - 10, pointerY + 10,
+        centerX + 10, pointerY + 10
+    })
 end
 
 -- ============================================================================
@@ -205,8 +257,8 @@ end
 local theme = themes[state.currentTheme]
 
 local root = UI.Column {
-    width = "900px",
-    height = "700px",
+    width = "1200px",
+    height = "900px",
     background = theme.background,
     windowTitle = "Decision Wheel",
     children = {
@@ -228,7 +280,7 @@ local root = UI.Column {
         -- Main content
         UI.Row {
             width = "100%",
-            height = "640px",
+            height = "840px",
             gap = 20,
             padding = "20px",
             children = {
@@ -259,13 +311,60 @@ local root = UI.Column {
                         UI.Button {
                             text = state.editIndex >= 0 and "Update" or "Add Option",
                             onClick = addOption,
+                            background = theme.accent,
+                            color = "#ffffff",
+                            padding = 10,
+                            width = "100%",
                         },
 
                         -- Options list
                         UI.Column {
                             gap = 5,
                             children = {
-                                -- Would dynamically create option items here
+                                -- Option 1: Meditation
+                                UI.Row {
+                                    width = "100%",
+                                    gap = 5,
+                                    padding = "8px",
+                                    background = "#2a2a2a",
+                                    children = {
+                                        UI.Text {
+                                            text = "Meditation",
+                                            color = theme.text,
+                                            fontSize = 14,
+                                        },
+                                    },
+                                },
+
+                                -- Option 2: Push ups
+                                UI.Row {
+                                    width = "100%",
+                                    gap = 5,
+                                    padding = "8px",
+                                    background = "#2a2a2a",
+                                    children = {
+                                        UI.Text {
+                                            text = "Push ups",
+                                            color = theme.text,
+                                            fontSize = 14,
+                                        },
+                                    },
+                                },
+
+                                -- Option 3: Jogging
+                                UI.Row {
+                                    width = "100%",
+                                    gap = 5,
+                                    padding = "8px",
+                                    background = "#2a2a2a",
+                                    children = {
+                                        UI.Text {
+                                            text = "Jogging",
+                                            color = theme.text,
+                                            fontSize = 14,
+                                        },
+                                    },
+                                },
                             },
                         },
                     },
@@ -273,18 +372,19 @@ local root = UI.Column {
 
                 -- Canvas panel
                 UI.Column {
-                    width = "580px",
+                    width = "850px",
                     height = "100%",
                     gap = 10,
                     alignItems = "center",
                     children = {
                         -- Canvas
                         UI.Canvas {
-                            width = 600,
-                            height = 500,
+                            width = 800,
+                            height = 700,
                             background = theme.secondary,
                             onDraw = function()
-                                drawCarousel(600, 500)
+                                print("[carousel] Canvas onDraw called")
+                                drawCarousel(800, 700)
                             end,
                             onUpdate = function(dt)
                                 updateSpin(dt)
@@ -298,6 +398,7 @@ local root = UI.Column {
                             height = "50px",
                             fontSize = 24,
                             background = theme.accent,
+                            color = "#ffffff",
                             onClick = spinWheel,
                         },
                     },
@@ -308,14 +409,17 @@ local root = UI.Column {
 }
 
 -- ============================================================================
--- Return App
+-- Run App
 -- ============================================================================
 
-return {
+-- Create app configuration
+local app = {
     root = root,
     window = {
-        width = 900,
-        height = 700,
+        width = 1200,
+        height = 900,
         title = "Decision Wheel"
     }
 }
+
+return app

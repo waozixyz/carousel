@@ -5,6 +5,7 @@ obj/
 build_web/
 carousel
 .kryon
+.kryon_cache
 carousel_html
 node_modules/
 package-lock.json
