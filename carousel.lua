@@ -85,6 +85,10 @@ end
 local function drawCarousel(canvasWidth, canvasHeight)
     print(string.format("[CAROUSEL] drawCarousel called: width=%d height=%d, options=%d", canvasWidth, canvasHeight, #state.options))
 
+    -- CRITICAL: Reset transform matrix to identity at start of each frame
+    -- Without this, transforms accumulate across frames causing rightward drift
+    canvas.origin()
+
     local theme = themes[state.currentTheme]
 
     -- Clear canvas with background color
@@ -96,7 +100,9 @@ local function drawCarousel(canvasWidth, canvasHeight)
 
     local centerX = canvasWidth / 2
     local centerY = canvasHeight / 2
-    local radius = math.min(canvasWidth, canvasHeight) / 2 - 50
+    -- Use 80px padding to ensure wheel fits comfortably with even spacing
+    local radius = math.min(canvasWidth, canvasHeight) / 2 - 80
+    print(string.format("[CAROUSEL] Center: (%.1f, %.1f), Radius: %.1f", centerX, centerY, radius))
 
     if #state.options == 0 then
         print("[CAROUSEL] No options to draw")
